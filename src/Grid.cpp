@@ -207,7 +207,7 @@ void Grid::fill(std::function<double(int,int)> func, bool halo)
         }
     }
 }
-
+// commit test
 //copies inner values to halo with a shift which depends on the function passed in
 //used mainly for neumann type boundary
 void Grid::copyToHalo(std::function<double(int,int)> shift_func, Direction dir)
