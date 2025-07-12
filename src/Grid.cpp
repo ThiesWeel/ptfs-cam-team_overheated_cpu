@@ -144,7 +144,7 @@ int Grid::numGrids(bool halo) const
 {
     return numGrids_y(halo)*numGrids_x(halo);
 }
-
+//hi
 // initialize the array with a function take 2 arguments(x,y), and evaluates the function on each of the grid point to fill in the array -2D
 //used mainly for dirichlet type boundary
 void Grid::fillBoundary(std::function<double(int,int)> func, Direction dir)
