@@ -1,0 +1,6 @@
+Date: Sun Jul 20 16:20:58 CEST 2025
+Test: AVX512
+Problem size: 20000x2000 (20000 x 2000)
+Cores: 0-17 (NUMA domain 0)
+========================================
+./benchmark_comparison.sh: line 70: likwid-perfctr: command not found

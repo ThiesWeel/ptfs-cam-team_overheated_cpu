@@ -1,0 +1,66 @@
+Memory Bandwidth Saturation Analysis
+====================================
+Date: Tue Jul 15 14:07:22 CEST 2025
+Source: BW_res.txt
+System: Dual-socket Intel Xeon Platinum 8360Y
+Cores: 18 (NUMA domain 0: cores 0-17)
+
+Write Allocate Evasion Assessment
+=================================
+
+Write allocate evasion is a memory optimization technique where cache lines
+are not allocated on write misses, allowing streaming writes to bypass the
+cache hierarchy and achieve higher memory bandwidth.
+
+Key Indicators of Effective Write Allocate Evasion:
+1. High sustained memory bandwidth (>80 GB/s for this system)
+2. Consistent bandwidth across different problem sizes
+3. Performance that doesn't degrade with larger datasets
+4. Cache hit rates remain reasonable despite large working sets
+
+Analysis Results:
+================
+
+Extracting memory bandwidth measurements...
+-------------------------------------------
+
+Problem Size Analysis:
+=====================
+
+Problem Size: 2k×20k
+======
+Memory Bandwidth: Not found
+
+Problem Size: 20k×2k
+======
+Memory Bandwidth: Not found
+
+Problem Size: 1k×400k
+=======
+Memory Bandwidth: Not found
+
+Overall Assessment:
+==================
+
+Recommendations:
+===============
+1. Check if memory bandwidth saturates the available hardware capacity
+   - Expected peak: ~204 GB/s for DDR4-3200 dual-channel
+   - Achieved peak: Use the maximum bandwidth from results above
+
+2. Verify consistent performance across problem sizes
+   - Consistent bandwidth suggests effective write allocate evasion
+   - Large variations may indicate cache thrashing or NUMA issues
+
+3. For optimal write allocate evasion:
+   - Ensure compiler optimizations are enabled (-O3, -xHost)
+   - Use streaming stores for large arrays
+   - Consider non-temporal stores for write-once data
+   - Verify NUMA binding is correct (cores 0-17 for domain 0)
+
+4. Additional optimizations to consider:
+   - Prefetching for regular memory access patterns
+   - Loop tiling for better cache locality
+   - SIMD optimizations (AVX-512 as already implemented)
+   - Memory alignment for optimal access patterns
+

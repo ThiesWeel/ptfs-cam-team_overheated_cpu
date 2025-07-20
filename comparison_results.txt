@@ -1,0 +1,58 @@
+================================================================
+    SEQUENTIAL vs PARALLEL GAUSS-SEIDEL COMPARISON
+================================================================
+Testing original sequential method vs diagonal parallel method
+Using CSV files with first row (zeros) skipped as requested
+
+Loading CSV files (skipping first row)...
+Successfully loaded x_init.csv (skipped first row)
+Successfully loaded rhs_init.csv (skipped first row)
+
+=== Analysis of x_init (non-zero rows) ===
+Non-zero rows analyzed: 9
+Min value: -5.103460e-15
+Max value: 5.712000e-15
+Mean value: 6.936729e-17
+L2 norm: 7.393891e-14
+
+=== Analysis of rhs_init (non-zero rows) ===
+Non-zero rows analyzed: 9
+Min value: -1.964950e-10
+Max value: 1.985640e-10
+Mean value: 1.377005e-12
+L2 norm: 2.717216e-09
+
+=== SEQUENTIAL vs PARALLEL COMPARISON BENCHMARK ===
+Grid size: 199 x 10
+Iterations per test: 100
+Skipping first row of CSV (zeros) as requested
+
+Thread Count | Sequential (μs) | Parallel (μs) | Speedup | Efficiency | Max Diff
+-------------|-----------------|---------------|---------|------------|----------
+           1 |           22.2 |        105.8 |   0.210 |      21.0% | 0.00e+00
+           2 |           22.2 |        319.4 |   0.070 |       3.5% | 0.00e+00
+           3 |           22.2 |        484.3 |   0.046 |       1.5% | 0.00e+00
+           4 |           22.2 |        808.5 |   0.027 |       0.7% | 0.00e+00
+           5 |           22.2 |        958.8 |   0.023 |       0.5% | 0.00e+00
+           6 |           22.2 |       1175.0 |   0.019 |       0.3% | 0.00e+00
+           7 |           22.2 |       1194.4 |   0.019 |       0.3% | 0.00e+00
+           8 |           22.2 |       1355.1 |   0.016 |       0.2% | 0.00e+00
+           9 |           22.2 |       1409.6 |   0.016 |       0.2% | 0.00e+00
+          10 |           22.2 |       1503.9 |   0.015 |       0.1% | 0.00e+00
+
+=== BENCHMARK SUMMARY ===
+✓ Sequential method serves as baseline reference
+✓ Parallel diagonal method maintains numerical accuracy
+✓ Speedup and efficiency calculated for threads 1-10
+✓ Maximum difference between methods shows precision
+✓ First row of CSV (zeros) excluded from analysis
+
+=== PERFORMANCE INSIGHTS ===
+• Speedup > 1.0 indicates parallel advantage
+• Efficiency shows how well threads are utilized
+• Max Diff should be very small (numerical precision)
+• Optimal thread count balances speedup vs efficiency
+
+================================================================
+    COMPARISON BENCHMARK COMPLETE
+================================================================

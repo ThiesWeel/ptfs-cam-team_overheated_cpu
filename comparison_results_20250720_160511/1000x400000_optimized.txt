@@ -1,0 +1,1 @@
+/home/hpc/ptfs/ptfs365v/ptfs-cam-team_overheated_cpu/simple_benchmark.sh: line 90: likwid-perfctr: command not found

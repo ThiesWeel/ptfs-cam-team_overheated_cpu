@@ -112,7 +112,24 @@ void PDE::applyStencil(Grid* lhs, Grid* x)
 #ifdef LIKWID_PERFMON
     LIKWID_MARKER_START("APPLY_STENCIL");
 #endif
+    
+    const int bj = 32;  // Block size in j (rows)
+    const int bi = 256; // Block size in i (columns)
+    #pragma omp parallel for schedule(static) num_threads(18) collapse(2)
+    for (int jb = 1; jb < ySize-1; jb += bj) {
+        for (int ib = 1; ib < xSize-1; ib += bi) {
+            int j_max = std::min(jb + bj, ySize-1);
+            int i_max = std::min(ib + bi, xSize-1);
+            for (int j = jb; j < j_max; ++j) {
+                int i;
+                for (i = ib; i <= i_max-8; i += 8) {
+                    __m512d x_center = _mm512_loadu_pd(&(*x)(j, i));
+                    __m512d x_north = _mm512_loadu_pd(&(*x)(j-1, i));
+                    __m512d x_south = _mm512_loadu_pd(&(*x)(j+1, i));
+                    __m512d x_west = _mm512_loadu_pd(&(*x)(j, i-1));
+                    __m512d x_east = _mm512_loadu_pd(&(*x)(j, i+1));
 
+<<<<<<< HEAD
     #pragma omp parallel for schedule(static)
     for (int j = 1; j < ySize-1; ++j) {
         int i;
@@ -134,6 +151,24 @@ void PDE::applyStencil(Grid* lhs, Grid* x)
         }
         for (; i < xSize-1; ++i) {
             (*lhs)(j,i) = w_c*(*x)(j,i) - w_y*((*x)(j+1,i) + (*x)(j-1,i)) - w_x*((*x)(j,i+1) + (*x)(j,i-1));
+=======
+                    __m512d north_south = _mm512_add_pd(x_north, x_south);
+                    __m512d west_east = _mm512_add_pd(x_west, x_east);
+                    __m512d center_term = _mm512_mul_pd(vec_w_c, x_center);
+                    __m512d y_term = _mm512_mul_pd(vec_w_y, north_south);
+                    __m512d x_term = _mm512_mul_pd(vec_w_x, west_east);
+                    __m512d result = _mm512_sub_pd(center_term, _mm512_add_pd(y_term, x_term));
+
+                    _mm512_storeu_pd(&(*lhs)(j, i), result);
+                }
+                // Scalar remainder
+                for (; i < i_max; ++i) {
+                    (*lhs)(j,i) = w_c*(*x)(j,i)
+                        - w_y*((*x)(j+1,i) + (*x)(j-1,i))
+                        - w_x*((*x)(j,i+1) + (*x)(j,i-1));
+                }
+            }
+>>>>>>> 40e1d68 (AVX512, Red-Black Gauss-seidel (PreCon), NUMA threading, cache blocking (applystencil))
         }
     }
 
@@ -164,6 +199,7 @@ void PDE::GSPreCon(Grid* rhs, Grid *x)
     LIKWID_MARKER_START("GS_PRE_CON");
 #endif
 
+<<<<<<< HEAD
     // Forward substitution
     for (int j=1; j<ySize-1; ++j) {
         for (int i=1; i<xSize-1; ++i) {
@@ -174,6 +210,65 @@ void PDE::GSPreCon(Grid* rhs, Grid *x)
     for (int j=ySize-2; j>0; --j) {
         for (int i=xSize-2; i>0; --i) {
             (*x)(j,i) = (*x)(j,i) + w_c*(w_y*(*x)(j+1,i) + w_x*(*x)(j,i+1));
+=======
+    // Red-Black Gauss-Seidel: Two phases for optimal vectorization
+    for (int color = 0; color < 2; ++color) {
+        #pragma omp parallel for schedule(static) num_threads(18) // Also implicit barrier
+        for (int j = 1; j < ySize-1; ++j) {
+            // Calculate starting point for this color
+            int i_start = 1 + (j + color) % 2;
+            
+            // Process 8 elements at a time (stride 2 for checkerboard)
+            int i;
+            for (i = i_start; i <= xSize-1-16; i += 16) {
+                // Load 8 elements with stride 2 (every other element)
+                __m512d rhs_vec = _mm512_set_pd(
+                    (*rhs)(j, i+14), (*rhs)(j, i+12), (*rhs)(j, i+10), (*rhs)(j, i+8),
+                    (*rhs)(j, i+6), (*rhs)(j, i+4), (*rhs)(j, i+2), (*rhs)(j, i)
+                );
+                
+                // Load neighbor values
+                __m512d x_north = _mm512_set_pd(
+                    (*x)(j-1, i+14), (*x)(j-1, i+12), (*x)(j-1, i+10), (*x)(j-1, i+8),
+                    (*x)(j-1, i+6), (*x)(j-1, i+4), (*x)(j-1, i+2), (*x)(j-1, i)
+                );
+                
+                __m512d x_south = _mm512_set_pd(
+                    (*x)(j+1, i+14), (*x)(j+1, i+12), (*x)(j+1, i+10), (*x)(j+1, i+8),
+                    (*x)(j+1, i+6), (*x)(j+1, i+4), (*x)(j+1, i+2), (*x)(j+1, i)
+                );
+                
+                __m512d x_west = _mm512_set_pd(
+                    (*x)(j, i+13), (*x)(j, i+11), (*x)(j, i+9), (*x)(j, i+7),
+                    (*x)(j, i+5), (*x)(j, i+3), (*x)(j, i+1), (*x)(j, i-1)
+                );
+                
+                __m512d x_east = _mm512_set_pd(
+                    (*x)(j, i+15), (*x)(j, i+13), (*x)(j, i+11), (*x)(j, i+9),
+                    (*x)(j, i+7), (*x)(j, i+5), (*x)(j, i+3), (*x)(j, i+1)
+                );
+                
+                // Vectorized computation: w_c*(rhs + w_y*(north+south) + w_x*(west+east))
+                __m512d temp1 = _mm512_add_pd(x_north, x_south);
+                __m512d temp2 = _mm512_add_pd(x_west, x_east);
+                __m512d temp3 = _mm512_fmadd_pd(vec_w_y, temp1, rhs_vec);
+                __m512d temp4 = _mm512_fmadd_pd(vec_w_x, temp2, temp3);
+                __m512d result = _mm512_mul_pd(vec_w_c, temp4);
+                
+                // Store results back with stride 2
+                double result_array[8];
+                _mm512_storeu_pd(result_array, result);
+                
+                for (int k = 0; k < 8; ++k) {
+                    (*x)(j, i + k*2) = result_array[k];
+                }
+            }
+            
+            // Handle remaining elements scalar
+            for (; i < xSize-1; i += 2) {
+                (*x)(j,i) = w_c*((*rhs)(j,i) + w_y*((*x)(j-1,i) + (*x)(j+1,i)) + w_x*((*x)(j,i-1) + (*x)(j,i+1)));
+            }
+>>>>>>> 40e1d68 (AVX512, Red-Black Gauss-seidel (PreCon), NUMA threading, cache blocking (applystencil))
         }
     }
 

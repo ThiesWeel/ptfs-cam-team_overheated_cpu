@@ -1,0 +1,7 @@
+Problem_Size,Test_Type,CG_Time,PCG_Time,Stencil_Time,GSPreCon_Time,CG_MLUP_s,PCG_MLUP_s,Total_DP_MFLOPS,AVX_DP_MFLOPS,AVX512_DP_MFLOPS,Vectorization_Ratio,Runtime_s
+2000x20000,AVX512,Extracting metrics for 2000x20000 from performance_comparison_20250720_162051/2000x20000_avx512.txt
+2000x20000,,,,,,,,,,,
+20000x2000,AVX512,Extracting metrics for 20000x2000 from performance_comparison_20250720_162051/20000x2000_avx512.txt
+20000x2000,,,,,,,,,,,
+1000x400000,AVX512,Extracting metrics for 1000x400000 from performance_comparison_20250720_162051/1000x400000_avx512.txt
+1000x400000,,,,,,,,,,,
