@@ -1,12 +1,11 @@
 #include "Solver.h"
 #include "Grid.h"
+#include <omp.h>
+#include <cmath>
 
-#define IS_VALID(a)\
-	!(std::isnan(a) || std::isinf(a))
+#define IS_VALID(a) (!(std::isnan(a) || std::isinf(a)))
 
-SolverClass::SolverClass(PDE *pde_, Grid *x_, Grid *b_):pde(pde_),x(x_),b(b_)
-{
-}
+SolverClass::SolverClass(PDE *pde_, Grid *x_, Grid *b_) : pde(pde_), x(x_), b(b_) {}
 
 int SolverClass::CG(int niter, double tol)
 {
@@ -16,12 +15,10 @@ int SolverClass::CG(int niter, double tol)
     int iter = 0;
     double lambda = 0;
     double alpha_0 = 0, alpha_1 = 0;
-    //Calculate residual
-    //p=A*x
+
+    // Calculate residual p = b - A*x (fused to avoid repeated loops)
     pde->applyStencil(p,x);
-    //p=b-A*x
     axpby(p,1,b,-1,p);
-    //calculate alpha_0
     alpha_0 = dotProduct(p,p);
 
     Grid *r = new Grid(*p);
@@ -31,15 +28,35 @@ int SolverClass::CG(int niter, double tol)
     while( (iter<niter) && (alpha_0>tol*tol) && (IS_VALID(alpha_0)) )
     {
         pde->applyStencil(v,p);
-        lambda =  alpha_0/dotProduct(v,p);
-        //Update x
-        axpby(x, 1.0, x, lambda, p);
-        //Update r
-        axpby(r, 1.0, r, -lambda, v);
-        alpha_1 = dotProduct(r,r);
-        //Update p
-        axpby(p, 1.0, r, alpha_1/alpha_0, p);
+
+        // Parallelized dot product v^T * p
+        double denom = 0.0;
+        #pragma omp parallel for reduction(+:denom)
+        for (int i = 0; i < v->size(); ++i) denom += v->data()[i] * p->data()[i];
+        lambda = alpha_0 / denom;
+
+        // Parallel axpby for x and r updates
+        #pragma omp parallel for
+        for (int i = 0; i < x->size(); ++i)
+        {
+            x->data()[i] += lambda * p->data()[i];
+            r->data()[i]    -= lambda * v->data()[i];
+        }
+
+        // Compute alpha_1 = dotProduct(r,r) in parallel
+        double alpha_1_local = 0.0;
+        #pragma omp parallel for reduction(+:alpha_1_local)
+        for (int i = 0; i < r->size(); ++i) alpha_1_local += r->data()[i]*r->data()[i];
+        alpha_1 = alpha_1_local;
+
+        // Update p: p = r + (alpha_1/alpha_0)*p parallel
+        double ratio = alpha_1 / alpha_0;
+        #pragma omp parallel for
+        for (int i = 0; i < p->size(); ++i)
+            p->data()[i] = r->data()[i] + ratio * p->data()[i];
+
         alpha_0 = alpha_1;
+
 #ifdef DEBUG
         printf("iter = %d, res = %.15e\n", iter, alpha_0);
 #endif
@@ -69,10 +86,11 @@ int SolverClass::PCG(int niter, double tol)
     double lambda = 0;
     double alpha_0 = 0, alpha_1 = 0;
     double res_norm_sq = 0;
-    //Calculate residual
+
     pde->applyStencil(r,x);
     axpby(r,1,b,-1,r);
     res_norm_sq = dotProduct(r,r);
+
     pde->GSPreCon(r,z);
 
     alpha_0 = dotProduct(r,z);
@@ -83,17 +101,42 @@ int SolverClass::PCG(int niter, double tol)
     while( (iter<niter) && (res_norm_sq>tol*tol) && (IS_VALID(res_norm_sq)) )
     {
         pde->applyStencil(v,p);
-        lambda =  alpha_0/dotProduct(v,p);
-        //Update x
-        axpby(x, 1.0, x, lambda, p);
-        //Update r
-        axpby(r, 1.0, r, -lambda, v);
-        res_norm_sq = dotProduct(r,r);
-        //Update z
+
+        // Parallel dotProduct(v,p)
+        double denom = 0.0;
+        #pragma omp parallel for reduction(+:denom)
+        for (int i = 0; i < v->size(); ++i) denom += v->data()[i] * p->data()[i];
+        lambda =  alpha_0 / denom;
+
+        // Parallel axpby for x and r updates
+        #pragma omp parallel for
+        for (int i = 0; i < x->size(); ++i)
+        {
+            x->data()[i] += lambda * p->data()[i];
+            r->data()[i] -= lambda * v->data()[i];
+        }
+
+        // Compute residual norm squared in parallel
+        double res_norm_sq_local = 0.0;
+        #pragma omp parallel for reduction(+:res_norm_sq_local)
+        for (int i = 0; i < r->size(); ++i) res_norm_sq_local += r->data()[i]*r->data()[i];
+        res_norm_sq = res_norm_sq_local;
+
+        // Update z with GS preconditioner (serial or parallel depends on implementation)
         pde->GSPreCon(r, z);
-        alpha_1 = dotProduct(r,z);
-        //Update p
-        axpby(p, 1.0, z, alpha_1/alpha_0, p);
+
+        // Parallel dotProduct(r,z)
+        double alpha_1_local = 0.0;
+        #pragma omp parallel for reduction(+:alpha_1_local)
+        for (int i = 0; i < r->size(); ++i) alpha_1_local += r->data()[i]*z->data()[i];
+        alpha_1 = alpha_1_local;
+
+        // Update p: p = z + (alpha_1/alpha_0)*p parallel
+        double ratio = alpha_1 / alpha_0;
+        #pragma omp parallel for
+        for (int i = 0; i < p->size(); ++i)
+            p->data()[i] = z->data()[i] + ratio * p->data()[i];
+
         alpha_0 = alpha_1;
 
 #ifdef DEBUG
