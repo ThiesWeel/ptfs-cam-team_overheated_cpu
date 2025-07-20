@@ -44,6 +44,9 @@ perf: perf.o $(DEPS)
 test: test_test.o $(DEPS:.o=_test.o)
 	$(CXX) $(CXXFLAGS) $(TEST_FLAGS) -o test test_test.o $(DEPS:.o=_test.o) $(LDFLAGS) $(LIBS) $(LIKWID_LINK_LIB)
 
+test_GSPreCon: test_GSPreCon.o $(DEPS)
+	$(CXX) $(CXXFLAGS) -o test_GSPreCon test_GSPreCon.o $(DEPS) $(LDFLAGS) $(LIBS) $(LIKWID_LINK_LIB)
+
 %.o: src/%.cpp
 	$(CXX) -c $(CXXFLAGS) -Wno-tautological-constant-compare $(INCLUDES) src/$(@:.o=).cpp
 
@@ -51,4 +54,4 @@ test: test_test.o $(DEPS:.o=_test.o)
 	$(CXX) -c $(CXXFLAGS) $(INCLUDES) $(TEST_FLAGS) -o $(@:_test=) src/$(@:_test.o=).cpp
 
 clean:
-	@$(RM) -rf *.o perf test results
+	rm -f *.o test perf test_GSPreCon
