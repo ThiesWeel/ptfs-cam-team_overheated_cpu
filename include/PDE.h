@@ -49,6 +49,9 @@ class PDE{
          * @param scale_rhs: scale rhs with diag
          * @param rev: In rev direction
          */
+
+        double applyStencilAt(int idx, Grid* g);
+
         void GSPreCon(Grid *rhs, Grid *u);
         /*@brief Solves for x:A*x=b
          *

@@ -11,6 +11,7 @@ double defaultBoundary(int i, int j, double h_x, double h_y)
 {
     return sin(M_PI*i*h_x)*sinh(M_PI*j*h_y);
 }
+
 double zeroFunc(int i, int j, double h_x, double h_y)
 {
     return 0 + 0*i*h_x + 0*j*h_y;
@@ -89,7 +90,7 @@ void PDE::refreshBoundary(Grid *u)
     }
 }
 
-// Optimized AVX-512 applyStencil
+// AVX-512 optimized applyStencil
 void PDE::applyStencil(Grid* lhs, Grid* x)
 {
     START_TIMER(APPLY_STENCIL);
@@ -179,7 +180,7 @@ void PDE::applyStencil(Grid* lhs, Grid* x)
     STOP_TIMER(APPLY_STENCIL);
 }
 
-// Forward-backward Gauss-Seidel (mathematically correct, passes all tests)
+// Gauss-Seidel preconditioner
 void PDE::GSPreCon(Grid* rhs, Grid *x)
 {
     START_TIMER(GS_PRE_CON);
@@ -279,6 +280,7 @@ void PDE::GSPreCon(Grid* rhs, Grid *x)
     STOP_TIMER(GS_PRE_CON);
 }
 
+// Solver dispatcher
 int PDE::solve(Grid *x, Grid *b, Solver type, int niter, double tol)
 {
     SolverClass solver(this, x, b);
@@ -295,4 +297,34 @@ int PDE::solve(Grid *x, Grid *b, Solver type, int niter, double tol)
         printf("Solver not existing\n");
         return -1;
     }
+}
+
+// ✅ NEW: Scalar applyStencilAt used in fused kernels
+double PDE::applyStencilAt(int idx, Grid* g)
+{
+    int nx = numGrids_x(true);  // includes halo
+    int ny = numGrids_y(true);
+
+    int i = idx % nx;
+    int j = idx / nx;
+
+    auto& u = g->data();
+
+    // Return 0 if outside bounds (halo or invalid)
+    if (i <= 0 || i >= nx - 1 || j <= 0 || j >= ny - 1)
+        return 0.0;
+
+    int idx_center = j * nx + i;
+    int idx_left   = j * nx + (i - 1);
+    int idx_right  = j * nx + (i + 1);
+    int idx_up     = (j - 1) * nx + i;
+    int idx_down   = (j + 1) * nx + i;
+
+    double w_x = 1.0 / (h_x * h_x);
+    double w_y = 1.0 / (h_y * h_y);
+    double w_c = 2.0 * w_x + 2.0 * w_y;
+
+    return w_c * u[idx_center]
+         - w_x * (u[idx_left] + u[idx_right])
+         - w_y * (u[idx_up] + u[idx_down]);
 }
